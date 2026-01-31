@@ -4,7 +4,8 @@ public enum GameState
 {
     Title,
     Playing,
-    GameOver
+    GameOver,
+    EnteringInitials
 }
 
 public class GameStateManager
@@ -16,22 +17,19 @@ public class GameStateManager
     public bool WaveClearedWithoutDamage { get; private set; }
     public bool IsNewHighScore { get; private set; }
 
+    // High score initials entry
+    public HighScoreManager HighScoreManager { get; }
+    public char[] PlayerInitials { get; } = { 'A', 'A', 'A' };
+    public int InitialsCursorPosition { get; set; }
+
     private const int StartingLives = 3;
     private const int WaveClearBonus = 100;
-
-    private readonly string _saveFilePath;
 
     public GameStateManager()
     {
         CurrentState = GameState.Title;
-
-        // Save file in user's local app data
-        string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string gameFolder = Path.Combine(appDataPath, "DemonAttackClone");
-        Directory.CreateDirectory(gameFolder);
-        _saveFilePath = Path.Combine(gameFolder, "highscore.dat");
-
-        LoadHighScore();
+        HighScoreManager = new HighScoreManager();
+        HighScore = HighScoreManager.GetHighestScore();
     }
 
     public void StartGame()
@@ -70,10 +68,6 @@ public class GameStateManager
         if (Lives <= 0)
         {
             CurrentState = GameState.GameOver;
-            if (IsNewHighScore)
-            {
-                SaveHighScore();
-            }
             return true;
         }
 
@@ -85,35 +79,64 @@ public class GameStateManager
         CurrentState = GameState.Title;
     }
 
-    private void LoadHighScore()
+    public void CheckAndEnterHighScore()
     {
-        try
+        if (HighScoreManager.IsHighScore(Score))
         {
-            if (File.Exists(_saveFilePath))
-            {
-                string content = File.ReadAllText(_saveFilePath);
-                if (int.TryParse(content.Trim(), out int savedScore))
-                {
-                    HighScore = savedScore;
-                }
-            }
+            ResetInitials();
+            CurrentState = GameState.EnteringInitials;
         }
-        catch
+        else
         {
-            // If loading fails, just start with 0
-            HighScore = 0;
+            CurrentState = GameState.Title;
         }
     }
 
-    private void SaveHighScore()
+    public void ResetInitials()
     {
-        try
+        PlayerInitials[0] = 'A';
+        PlayerInitials[1] = 'A';
+        PlayerInitials[2] = 'A';
+        InitialsCursorPosition = 0;
+    }
+
+    public void SetCurrentInitial(char letter)
+    {
+        if (letter >= 'A' && letter <= 'Z')
         {
-            File.WriteAllText(_saveFilePath, HighScore.ToString());
+            PlayerInitials[InitialsCursorPosition] = letter;
         }
-        catch
-        {
-            // Silently fail if we can't save
-        }
+    }
+
+    public void CycleInitialUp()
+    {
+        char c = PlayerInitials[InitialsCursorPosition];
+        c = c == 'Z' ? 'A' : (char)(c + 1);
+        PlayerInitials[InitialsCursorPosition] = c;
+    }
+
+    public void CycleInitialDown()
+    {
+        char c = PlayerInitials[InitialsCursorPosition];
+        c = c == 'A' ? 'Z' : (char)(c - 1);
+        PlayerInitials[InitialsCursorPosition] = c;
+    }
+
+    public void MoveCursorLeft()
+    {
+        InitialsCursorPosition = Math.Max(0, InitialsCursorPosition - 1);
+    }
+
+    public void MoveCursorRight()
+    {
+        InitialsCursorPosition = Math.Min(2, InitialsCursorPosition + 1);
+    }
+
+    public void SubmitHighScore()
+    {
+        string initials = new string(PlayerInitials);
+        HighScoreManager.AddScore(Score, initials);
+        HighScore = HighScoreManager.GetHighestScore();
+        CurrentState = GameState.Title;
     }
 }

@@ -88,6 +88,9 @@ public class Game1 : Game
             case GameState.GameOver:
                 UpdateGameOver(keyboardState);
                 break;
+            case GameState.EnteringInitials:
+                UpdateEnteringInitials(keyboardState);
+                break;
         }
 
         _previousKeyboardState = keyboardState;
@@ -223,11 +226,78 @@ public class Game1 : Game
     {
         if (keyboardState.IsKeyDown(Keys.Enter) && _previousKeyboardState.IsKeyUp(Keys.Enter))
         {
-            StartNewGame();
+            // If it's a high score, enter initials first before allowing restart
+            if (_gameStateManager.HighScoreManager.IsHighScore(_gameStateManager.Score))
+            {
+                _gameStateManager.CheckAndEnterHighScore();
+            }
+            else
+            {
+                StartNewGame();
+            }
         }
         if (keyboardState.IsKeyDown(Keys.Space) && _previousKeyboardState.IsKeyUp(Keys.Space))
         {
-            _gameStateManager.ReturnToTitle();
+            _gameStateManager.CheckAndEnterHighScore();
+        }
+    }
+
+    private void UpdateEnteringInitials(KeyboardState keyboardState)
+    {
+        // Handle letter keys A-Z
+        for (Keys key = Keys.A; key <= Keys.Z; key++)
+        {
+            if (keyboardState.IsKeyDown(key) && _previousKeyboardState.IsKeyUp(key))
+            {
+                char letter = (char)('A' + (key - Keys.A));
+                _gameStateManager.SetCurrentInitial(letter);
+                // Auto-advance cursor unless at last position
+                if (_gameStateManager.InitialsCursorPosition < 2)
+                {
+                    _gameStateManager.MoveCursorRight();
+                }
+            }
+        }
+
+        // Navigate with arrow keys
+        if (keyboardState.IsKeyDown(Keys.Up) && _previousKeyboardState.IsKeyUp(Keys.Up))
+        {
+            _gameStateManager.CycleInitialUp();
+        }
+        if (keyboardState.IsKeyDown(Keys.Down) && _previousKeyboardState.IsKeyUp(Keys.Down))
+        {
+            _gameStateManager.CycleInitialDown();
+        }
+        if (keyboardState.IsKeyDown(Keys.Left) && _previousKeyboardState.IsKeyUp(Keys.Left))
+        {
+            _gameStateManager.MoveCursorLeft();
+        }
+        if (keyboardState.IsKeyDown(Keys.Right) && _previousKeyboardState.IsKeyUp(Keys.Right))
+        {
+            _gameStateManager.MoveCursorRight();
+        }
+
+        // Backspace to go back
+        if (keyboardState.IsKeyDown(Keys.Back) && _previousKeyboardState.IsKeyUp(Keys.Back))
+        {
+            if (_gameStateManager.InitialsCursorPosition > 0)
+            {
+                _gameStateManager.MoveCursorLeft();
+            }
+            _gameStateManager.SetCurrentInitial('A');
+        }
+
+        // Enter to submit and go to title
+        if (keyboardState.IsKeyDown(Keys.Enter) && _previousKeyboardState.IsKeyUp(Keys.Enter))
+        {
+            _gameStateManager.SubmitHighScore();
+        }
+
+        // Space to submit and play again
+        if (keyboardState.IsKeyDown(Keys.Space) && _previousKeyboardState.IsKeyUp(Keys.Space))
+        {
+            _gameStateManager.SubmitHighScore();
+            StartNewGame();
         }
     }
 
@@ -248,6 +318,9 @@ public class Game1 : Game
             case GameState.GameOver:
                 DrawGameOver();
                 break;
+            case GameState.EnteringInitials:
+                DrawEnteringInitials();
+                break;
         }
 
         _spriteBatch.End();
@@ -258,21 +331,53 @@ public class Game1 : Game
     private void DrawTitle()
     {
         // Title
-        DrawCenteredText("DEMON ATTACK", ScreenHeight / 3, Color.Red, 3);
+        DrawCenteredText("DEMON ATTACK", 50, Color.Red, 3);
 
         // Instructions
-        DrawCenteredText("Press SPACE or ENTER to Start", ScreenHeight / 2, Color.White, 1);
+        DrawCenteredText("Press SPACE or ENTER to Start", 120, Color.White, 1);
 
-        // Controls
-        DrawCenteredText("Controls:", ScreenHeight / 2 + 60, Color.Gray, 1);
-        DrawCenteredText("LEFT/RIGHT or A/D - Move", ScreenHeight / 2 + 90, Color.Gray, 1);
-        DrawCenteredText("SPACE or W - Fire", ScreenHeight / 2 + 120, Color.Gray, 1);
-        DrawCenteredText("ESC - Quit", ScreenHeight / 2 + 150, Color.Gray, 1);
-
-        // High score
-        if (_gameStateManager.HighScore > 0)
+        var scores = _gameStateManager.HighScoreManager.Scores;
+        if (scores.Count > 0)
         {
-            DrawCenteredText($"High Score: {_gameStateManager.HighScore}", ScreenHeight - 50, Color.Yellow, 1);
+            // Two-column layout: Controls on left, High Scores on right
+            int leftColumnX = 50;
+            int rightColumnX = ScreenWidth / 2 + 50;
+            int startY = 170;
+
+            // Left column: Controls
+            DrawText("CONTROLS:", leftColumnX, startY, Color.Cyan, 1);
+            DrawText("LEFT/RIGHT or A/D - Move", leftColumnX, startY + 30, Color.Gray, 1);
+            DrawText("SPACE or W - Fire", leftColumnX, startY + 55, Color.Gray, 1);
+            DrawText("ESC - Quit", leftColumnX, startY + 80, Color.Gray, 1);
+
+            // Right column: High Scores
+            DrawText("HIGH SCORES:", rightColumnX, startY, Color.Yellow, 1);
+
+            // Header row
+            DrawText("RANK", rightColumnX, startY + 30, Color.Gray, 1);
+            DrawText("NAME", rightColumnX + 60, startY + 30, Color.Gray, 1);
+            DrawText("SCORE", rightColumnX + 120, startY + 30, Color.Gray, 1);
+            DrawText("DATE", rightColumnX + 200, startY + 30, Color.Gray, 1);
+
+            // Score rows
+            for (int i = 0; i < scores.Count; i++)
+            {
+                int rowY = startY + 55 + i * 25;
+                Color rowColor = i == 0 ? Color.Yellow : Color.White;
+
+                DrawText($"{i + 1}.", rightColumnX, rowY, rowColor, 1);
+                DrawText(scores[i].Initials, rightColumnX + 60, rowY, rowColor, 1);
+                DrawText($"{scores[i].Score}", rightColumnX + 120, rowY, rowColor, 1);
+                DrawText(scores[i].Date.ToString("MM/dd/yy"), rightColumnX + 200, rowY, rowColor, 1);
+            }
+        }
+        else
+        {
+            // No high scores yet - centered controls
+            DrawCenteredText("Controls:", ScreenHeight / 2 + 60, Color.Gray, 1);
+            DrawCenteredText("LEFT/RIGHT or A/D - Move", ScreenHeight / 2 + 90, Color.Gray, 1);
+            DrawCenteredText("SPACE or W - Fire", ScreenHeight / 2 + 120, Color.Gray, 1);
+            DrawCenteredText("ESC - Quit", ScreenHeight / 2 + 150, Color.Gray, 1);
         }
     }
 
@@ -330,13 +435,78 @@ public class Game1 : Game
         DrawCenteredText($"Final Score: {_gameStateManager.Score}", ScreenHeight / 2, Color.White, 2);
         DrawCenteredText($"Wave Reached: {_waveManager.CurrentWave}", ScreenHeight / 2 + 50, Color.Cyan, 1);
 
-        if (_gameStateManager.Score >= _gameStateManager.HighScore && _gameStateManager.HighScore > 0)
+        if (_gameStateManager.HighScoreManager.IsHighScore(_gameStateManager.Score))
         {
             DrawCenteredText("NEW HIGH SCORE!", ScreenHeight / 2 + 100, Color.Yellow, 2);
+            DrawCenteredText("Press ENTER to Enter Your Initials", ScreenHeight - 80, Color.White, 1);
+        }
+        else
+        {
+            DrawCenteredText("Press ENTER to Play Again", ScreenHeight - 100, Color.White, 1);
+            DrawCenteredText("Press SPACE for Title Screen", ScreenHeight - 60, Color.Gray, 1);
+        }
+    }
+
+    private void DrawEnteringInitials()
+    {
+        // Title
+        DrawCenteredText("NEW HIGH SCORE!", ScreenHeight / 4, Color.Yellow, 3);
+
+        // Score display
+        DrawCenteredText($"Score: {_gameStateManager.Score}", ScreenHeight / 4 + 60, Color.White, 2);
+
+        // Instructions
+        DrawCenteredText("Enter Your Initials", ScreenHeight / 2 - 40, Color.Cyan, 1);
+
+        // Draw the three initial boxes
+        int boxWidth = 40;
+        int boxHeight = 50;
+        int boxSpacing = 20;
+        int totalWidth = 3 * boxWidth + 2 * boxSpacing;
+        int startX = (ScreenWidth - totalWidth) / 2;
+        int boxY = ScreenHeight / 2;
+
+        for (int i = 0; i < 3; i++)
+        {
+            int boxX = startX + i * (boxWidth + boxSpacing);
+            bool isSelected = i == _gameStateManager.InitialsCursorPosition;
+
+            // Draw box border
+            Color boxColor = isSelected ? Color.Yellow : Color.Gray;
+            ShapeRenderer.DrawRectangle(_spriteBatch, boxX, boxY, boxWidth, boxHeight, boxColor);
+            ShapeRenderer.DrawRectangle(_spriteBatch, boxX + 2, boxY + 2, boxWidth - 4, boxHeight - 4, Color.Black);
+
+            // Draw the letter
+            char letter = _gameStateManager.PlayerInitials[i];
+            int letterX = boxX + (boxWidth - 6 * 2) / 2;  // Center the letter (6*scale width)
+            int letterY = boxY + (boxHeight - 8 * 2) / 2; // Center vertically
+            DrawChar(letter, letterX, letterY, isSelected ? Color.Yellow : Color.White, 2);
+
+            // Draw up/down arrows for selected box
+            if (isSelected)
+            {
+                // Up arrow (points up)
+                int arrowX = boxX + boxWidth / 2;
+                int arrowUpY = boxY - 20;
+                ShapeRenderer.DrawInvertedTriangle(_spriteBatch,
+                    new Vector2(arrowX, arrowUpY + 12),
+                    16, 12,
+                    Color.Yellow);
+
+                // Down arrow (points down)
+                int arrowDownY = boxY + boxHeight + 8;
+                ShapeRenderer.DrawTriangle(_spriteBatch,
+                    new Vector2(arrowX, arrowDownY),
+                    16, 12,
+                    Color.Yellow);
+            }
         }
 
-        DrawCenteredText("Press ENTER to Play Again", ScreenHeight - 100, Color.White, 1);
-        DrawCenteredText("Press SPACE for Title Screen", ScreenHeight - 60, Color.Gray, 1);
+        // Instructions at bottom
+        DrawCenteredText("Type A-Z or use UP/DOWN to change letter", ScreenHeight - 140, Color.Gray, 1);
+        DrawCenteredText("LEFT/RIGHT to move cursor - BACKSPACE to clear", ScreenHeight - 110, Color.Gray, 1);
+        DrawCenteredText("ENTER - Save and View Scores", ScreenHeight - 70, Color.White, 1);
+        DrawCenteredText("SPACE - Save and Play Again", ScreenHeight - 40, Color.Cyan, 1);
     }
 
     private void DrawText(string text, int x, int y, Color color, int scale)
