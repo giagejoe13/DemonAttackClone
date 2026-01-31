@@ -23,6 +23,7 @@ public class GameStateManager
     public int InitialsCursorPosition { get; set; }
 
     private const int StartingLives = 3;
+    private const int MaxLives = 3;
     private const int WaveClearBonus = 100;
 
     public GameStateManager()
@@ -58,6 +59,12 @@ public class GameStateManager
             AddScore(WaveClearBonus * waveNumber);
         }
         WaveClearedWithoutDamage = true;
+
+        // Award an extra life for clearing the wave (max 3 lives)
+        if (Lives < MaxLives)
+        {
+            Lives++;
+        }
     }
 
     public bool LoseLife()

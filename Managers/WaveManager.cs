@@ -30,6 +30,26 @@ public class WaveManager
         Color.Coral
     };
 
+    // Demon types cycle every 5 waves
+    private static readonly DemonType[] WaveDemonTypes =
+    {
+        DemonType.Classic,
+        DemonType.Bat,
+        DemonType.Moth,
+        DemonType.Dragon,
+        DemonType.Phoenix
+    };
+
+    // Wing styles cycle every 5 waves (offset from demon types for variety)
+    private static readonly WingStyle[] WaveWingStyles =
+    {
+        WingStyle.Normal,
+        WingStyle.Membrane,
+        WingStyle.Feathered,
+        WingStyle.Jagged,
+        WingStyle.Flame
+    };
+
     public WaveManager(int screenWidth, int screenHeight)
     {
         _screenWidth = screenWidth;
@@ -66,6 +86,10 @@ public class WaveManager
         Demons.Clear();
 
         Color waveColor = WaveColors[(CurrentWave - 1) % WaveColors.Length];
+        DemonType demonType = WaveDemonTypes[(CurrentWave - 1) % WaveDemonTypes.Length];
+        // Offset wing style by 2 so type and style don't always match
+        WingStyle wingStyle = WaveWingStyles[(CurrentWave + 1) % WaveWingStyles.Length];
+
         int demonCount = Math.Min(BaseDemonCount + (CurrentWave - 1), 12);
         float baseSpeed = 50f + (CurrentWave - 1) * 10f;
 
@@ -82,7 +106,7 @@ public class WaveManager
 
             for (int col = 0; col < demonsInThisRow; col++)
             {
-                var demon = new Demon(_screenWidth, waveColor);
+                var demon = new Demon(_screenWidth, waveColor, demonType, wingStyle);
                 float x = spacing * (col + 1);
                 demon.Spawn(new Vector2(x, rowY), DemonSize.Large, baseSpeed, GetAggressiveness());
                 Demons.Add(demon);
@@ -90,6 +114,9 @@ public class WaveManager
             }
         }
     }
+
+    public DemonType GetCurrentDemonType() => WaveDemonTypes[(CurrentWave - 1) % WaveDemonTypes.Length];
+    public WingStyle GetCurrentWingStyle() => WaveWingStyles[(CurrentWave + 1) % WaveWingStyles.Length];
 
     public float GetSpeedMultiplier()
     {
@@ -110,12 +137,14 @@ public class WaveManager
     public void SpawnSplitDemons(Demon parent)
     {
         Color waveColor = WaveColors[(CurrentWave - 1) % WaveColors.Length];
+        DemonType demonType = GetCurrentDemonType();
+        WingStyle wingStyle = GetCurrentWingStyle();
         float baseSpeed = 60f + (CurrentWave - 1) * 15f;
 
-        // Spawn two smaller demons
+        // Spawn two smaller demons (inherit parent's type and style)
         for (int i = 0; i < 2; i++)
         {
-            var demon = new Demon(_screenWidth, waveColor);
+            var demon = new Demon(_screenWidth, waveColor, parent.Type, parent.Wings);
             float offsetX = (i == 0 ? -20 : 20);
             demon.Spawn(
                 new Vector2(parent.Position.X + offsetX, parent.Position.Y),

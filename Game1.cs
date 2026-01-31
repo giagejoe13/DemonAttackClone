@@ -174,20 +174,38 @@ public class Game1 : Game
 
     private void CheckCollisions()
     {
-        // Player bullet vs demons
-        var hitDemon = CollisionManager.CheckBulletVsDemons(_playerBullet, _waveManager.Demons);
-        if (hitDemon != null)
+        // Player bullet vs demons (with wing detection)
+        var hitResult = CollisionManager.CheckBulletVsDemonsWithWings(_playerBullet, _waveManager.Demons);
+        if (hitResult.Demon != null)
         {
             _playerBullet.Deactivate();
-            _gameStateManager.AddScore(hitDemon.GetPoints());
-            _soundManager.PlayExplosion();
 
-            if (hitDemon.ShouldSplit())
+            switch (hitResult.HitType)
             {
-                _waveManager.SpawnSplitDemons(hitDemon);
-            }
+                case HitType.LeftWing:
+                    hitResult.Demon.DestroyLeftWing();
+                    _gameStateManager.AddScore(hitResult.Demon.GetWingPoints());
+                    _soundManager.PlayExplosion();
+                    break;
 
-            hitDemon.Destroy();
+                case HitType.RightWing:
+                    hitResult.Demon.DestroyRightWing();
+                    _gameStateManager.AddScore(hitResult.Demon.GetWingPoints());
+                    _soundManager.PlayExplosion();
+                    break;
+
+                case HitType.Body:
+                    _gameStateManager.AddScore(hitResult.Demon.GetPoints());
+                    _soundManager.PlayExplosion();
+
+                    if (hitResult.Demon.ShouldSplit())
+                    {
+                        _waveManager.SpawnSplitDemons(hitResult.Demon);
+                    }
+
+                    hitResult.Demon.Destroy();
+                    break;
+            }
         }
 
         // Demon bullets vs player
